@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SB Marathon Training</title>
+    <script>
+      // SPA redirect: encode the current path/query/hash into a query string
+      // and redirect to the root so index.html (and React Router) can handle it.
+      // The segmentCount (1) matches the number of path segments in the GitHub Pages
+      // repo subdirectory — e.g. /MarathonTrainer/ = 1 segment.
+      var segmentCount = 1;
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/?p=/' +
+        l.pathname.split('/').slice(1 + segmentCount).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

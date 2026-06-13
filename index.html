@@ -2,6 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Decode the path encoded by 404.html and restore it via history.replaceState
+      // before React Router initialises, so deep links and refreshes work on GitHub Pages.
+      (function () {
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+          return;
+        }
+        var search = location.search;
+        if (search.indexOf('?p=/') === 0 || search.indexOf('p=') !== -1) {
+          var params = search.slice(1).split('&').reduce(function (p, s) {
+            var kv = s.split('=');
+            p[decodeURIComponent(kv[0])] = decodeURIComponent(kv.slice(1).join('='));
+            return p;
+          }, {});
+          if (params.p !== undefined) {
+            var path = '/MarathonTrainer' + params.p.replace(/~and~/g, '&');
+            var query = params.q ? '?' + params.q.replace(/~and~/g, '&') : '';
+            var hash = location.hash;
+            history.replaceState(null, null, path + query + hash);
+          }
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/MarathonTrainer/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SB Marathon Training</title>
