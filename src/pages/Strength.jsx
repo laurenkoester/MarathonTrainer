@@ -15,7 +15,7 @@ export default function Strength() {
 
   return (
     <PageWrapper>
-      <h1 className="font-display text-4xl tracking-widest">Strength Log</h1>
+      <h1 className="font-display text-3xl tracking-widest sm:text-4xl">Strength Log</h1>
 
       <div className="mt-6 rounded-xl border border-border bg-white p-5 shadow-sm">
         <p className="text-xs font-bold uppercase tracking-widest text-muted">Current Phase</p>
@@ -45,7 +45,7 @@ export default function Strength() {
         {!showForm ? (
           <button
             onClick={() => setShowForm(true)}
-            className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+            className="w-full rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white hover:bg-orange-600 sm:w-auto"
           >
             Log new session
           </button>

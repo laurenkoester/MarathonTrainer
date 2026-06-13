@@ -1,20 +1,54 @@
+import { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { getDate } from 'date-fns';
 import { WORKOUT_TYPES, inferType, parsePlannedDistance, parsePlannedPace } from '../../utils/workoutTypes';
-import { stravaRunsToDayDisplay } from '../../utils/stravaApi';
 import { formatShort, isToday as checkIsToday } from '../../utils/dates';
+import { useLongPress } from '../../hooks/useLongPress';
+import WorkoutEditModal from '../workout/WorkoutEditModal';
+import { resolveDayDisplay } from '../../utils/activityMiles';
 
-function resolveDayDisplay(logs, stravaRuns) {
-  if (logs.length > 0) {
-    return { entries: logs, fromStrava: false };
-  }
-  const stravaDisplay = stravaRunsToDayDisplay(stravaRuns);
-  if (stravaDisplay) {
-    return { entries: [stravaDisplay], fromStrava: true };
-  }
-  return { entries: [], fromStrava: false };
+// Compact mobile cell — day number + color dot + optional miles
+function CalendarDayMobile({ date, workout, logs, stravaRuns, isToday, isPast, editMode, isSelected, isOver, isDragging }) {
+  const { entries } = resolveDayDisplay(logs, stravaRuns);
+  const isLogged = entries.length > 0;
+  const totalMiles = entries.reduce((sum, e) => sum + (parseFloat(e.miles) || 0), 0);
+  const plannedMiles = workout ? parsePlannedDistance(workout) : null;
+  const displayMiles = isLogged && totalMiles > 0 ? totalMiles : plannedMiles;
+
+  const displayType = isLogged
+    ? inferType(entries[entries.length - 1]?.actualWo || workout || '')
+    : inferType(workout || '');
+  const { bar, bg } = WORKOUT_TYPES[displayType];
+
+  return (
+    <div
+      className={`relative flex min-h-[56px] flex-col items-center justify-center rounded-lg border p-1 ${
+        editMode ? 'border-dashed cursor-grab' : 'border-border'
+      } ${isToday ? 'ring-2 ring-accent' : ''} ${
+        isPast && !isLogged && !editMode ? 'opacity-40' : ''
+      } ${isSelected ? 'ring-2 ring-accent ring-offset-1' : ''} ${
+        isOver ? 'ring-2 ring-emerald-400' : ''
+      } ${isDragging ? 'opacity-40' : ''}`}
+      style={{ backgroundColor: bg }}
+    >
+      <div className="absolute left-0 top-0 h-full w-[3px] rounded-l-lg" style={{ backgroundColor: bar }} />
+      <span className={`text-sm font-bold ${isToday ? 'text-accent' : ''}`}>
+        {getDate(date)}
+      </span>
+      {displayMiles != null && displayMiles > 0 && (
+        <span className={`text-[9px] font-semibold leading-none ${isLogged ? 'text-emerald-700' : 'text-muted'}`}>
+          {Number(displayMiles).toFixed(displayMiles % 1 === 0 ? 0 : 1)}
+        </span>
+      )}
+      {isLogged && (
+        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      )}
+    </div>
+  );
 }
 
+// Full desktop cell
 export function CalendarDayContent({
   date,
   workout,
@@ -128,13 +162,18 @@ export default function CalendarDay({
   logs = [],
   stravaRuns = [],
   inPlan,
+  wi,
+  di,
   editMode = false,
   dragId = null,
   isSelected = false,
   onClick,
 }) {
+  const [editOpen, setEditOpen] = useState(false);
   const isToday = checkIsToday(date);
   const isPast = date < new Date(new Date().setHours(0, 0, 0, 0)) && !isToday;
+
+  const longPress = useLongPress(() => setEditOpen(true));
 
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: dragId ?? 'disabled',
@@ -152,46 +191,79 @@ export default function CalendarDay({
   }
 
   if (!inPlan) {
-    return <div className="min-h-[110px] rounded-lg bg-surface/50 md:min-h-[130px]" />;
+    return (
+      <>
+        <div className="min-h-[56px] rounded-lg bg-surface/50 md:hidden" />
+        <div className="hidden min-h-[110px] rounded-lg bg-surface/50 md:block md:min-h-[130px]" />
+      </>
+    );
   }
 
   const style = editMode && transform
     ? { transform: CSS.Translate.toString(transform) }
     : undefined;
 
-  const content = (
-    <CalendarDayContent
-      date={date}
+  const sharedProps = {
+    date, workout, logs, stravaRuns, isToday, isPast, editMode, isSelected, isOver, isDragging,
+  };
+
+  const longPressHandlers = {
+    onContextMenu: longPress.onContextMenu,
+    onTouchStart: longPress.onTouchStart,
+    onTouchEnd: longPress.onTouchEnd,
+    onTouchMove: longPress.onTouchMove,
+  };
+
+  const modal = editOpen && wi != null && di != null && (
+    <WorkoutEditModal
+      wi={wi}
+      di={di}
       workout={workout}
-      logs={logs}
-      stravaRuns={stravaRuns}
-      isToday={isToday}
-      isPast={isPast}
-      editMode={editMode}
-      isSelected={isSelected}
-      isOver={isOver}
-      isDragging={isDragging}
+      date={date}
+      onClose={() => setEditOpen(false)}
     />
   );
 
   if (editMode) {
     return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        onClick={onClick}
-        {...listeners}
-        {...attributes}
-      >
-        {content}
-      </div>
+      <>
+        <div
+          ref={setNodeRef}
+          style={style}
+          onClick={(e) => { longPress.onClick(e); if (!e.defaultPrevented) onClick?.(); }}
+          {...longPressHandlers}
+          {...listeners}
+          {...attributes}
+        >
+          <div className="md:hidden">
+            <CalendarDayMobile {...sharedProps} />
+          </div>
+          <div className="hidden md:block">
+            <CalendarDayContent {...sharedProps} />
+          </div>
+        </div>
+        {modal}
+      </>
     );
   }
 
   return (
-    <button type="button" onClick={onClick} className="w-full">
-      {content}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={(e) => { longPress.onClick(e); if (!e.defaultPrevented) onClick?.(); }}
+        {...longPressHandlers}
+        className="w-full"
+      >
+        <div className="md:hidden">
+          <CalendarDayMobile {...sharedProps} />
+        </div>
+        <div className="hidden md:block">
+          <CalendarDayContent {...sharedProps} />
+        </div>
+      </button>
+      {modal}
+    </>
   );
 }
 

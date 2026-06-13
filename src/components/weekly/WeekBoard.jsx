@@ -8,12 +8,14 @@ import {
   useSensors,
   closestCenter,
 } from '@dnd-kit/core';
-import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, horizontalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable';
 import DayCard, { DayCardOverlay } from './DayCard';
 import { usePlan } from '../../hooks/usePlan';
+import { useStravaAllRuns } from '../../hooks/useStravaAllRuns';
 import { getDateForCell, formatISO } from '../../utils/dates';
 
 export default function WeekBoard({ wi, logs }) {
+  const { runsByDate } = useStravaAllRuns();
   const { plan, dispatch } = usePlan();
   const week = plan[wi];
   const [activeId, setActiveId] = useState(null);
@@ -21,7 +23,7 @@ export default function WeekBoard({ wi, logs }) {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 700, tolerance: 5 } }),
   );
 
   const dayIds = week.d.map((_, di) => `${wi}-${di}`);
@@ -30,6 +32,11 @@ export default function WeekBoard({ wi, logs }) {
     const date = getDateForCell(wi, di);
     const dateStr = formatISO(date);
     return logs.filter(l => l.date === dateStr);
+  }
+
+  function getStravaForDay(di) {
+    const dateStr = formatISO(getDateForCell(wi, di));
+    return runsByDate[dateStr] ?? [];
   }
 
   function handleDragStart(event) {
@@ -71,8 +78,9 @@ export default function WeekBoard({ wi, logs }) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <SortableContext items={dayIds} strategy={horizontalListSortingStrategy}>
-        <div className="flex gap-3 overflow-x-auto pb-2">
+      {/* Mobile: 2-column grid. Desktop: horizontal scroll row. */}
+      <SortableContext items={dayIds} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-2 gap-3 md:hidden">
           {week.d.map((workout, di) => {
             const id = `${wi}-${di}`;
             return (
@@ -84,6 +92,29 @@ export default function WeekBoard({ wi, logs }) {
                 workout={workout}
                 date={getDateForCell(wi, di)}
                 logs={getLogsForDay(di)}
+                stravaRuns={getStravaForDay(di)}
+                isSelected={selectedId === id}
+                onClick={() => handleClick(id)}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
+
+      <SortableContext items={dayIds} strategy={horizontalListSortingStrategy}>
+        <div className="hidden gap-3 overflow-x-auto pb-2 md:flex">
+          {week.d.map((workout, di) => {
+            const id = `${wi}-${di}`;
+            return (
+              <DayCard
+                key={id}
+                id={id}
+                wi={wi}
+                di={di}
+                workout={workout}
+                date={getDateForCell(wi, di)}
+                logs={getLogsForDay(di)}
+                stravaRuns={getStravaForDay(di)}
                 isSelected={selectedId === id}
                 onClick={() => handleClick(id)}
               />

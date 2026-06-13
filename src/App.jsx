@@ -3,9 +3,10 @@ import Nav from './components/layout/Nav';
 import Today from './pages/Today';
 import Calendar from './pages/Calendar';
 import Weekly from './pages/Weekly';
-import Progress from './pages/Progress';
 import Strength from './pages/Strength';
+import Progress from './pages/Progress';
 import StravaCallback from './pages/StravaCallback';
+import { AuthProvider } from './context/AuthContext';
 import { PlanProvider } from './context/PlanContext';
 import { LogProvider } from './context/LogContext';
 import { StravaProvider } from './context/StravaContext';
@@ -13,6 +14,7 @@ import { StrengthProvider } from './context/StrengthContext';
 
 export default function App() {
   return (
+    <AuthProvider>
     <PlanProvider>
       <LogProvider>
         <StravaProvider>
@@ -23,8 +25,8 @@ export default function App() {
                 <Route path="/" element={<Today />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/weekly" element={<Weekly />} />
-                <Route path="/progress" element={<Progress />} />
                 <Route path="/strength" element={<Strength />} />
+                <Route path="/progress" element={<Progress />} />
                 <Route path="/strava/callback" element={<StravaCallback />} />
               </Routes>
             </BrowserRouter>
@@ -32,5 +34,6 @@ export default function App() {
         </StravaProvider>
       </LogProvider>
     </PlanProvider>
+    </AuthProvider>
   );
 }

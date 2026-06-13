@@ -11,10 +11,11 @@ import {
 import { eachDayOfInterval, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth } from 'date-fns';
 import CalendarDay, { CalendarDayOverlay } from './CalendarDay';
 import WeekTotal from './WeekTotal';
-import { getCellForDate, formatISO, DAY_NAMES } from '../../utils/dates';
+import { getCellForDate, formatISO, DAY_NAMES, getCurrentWeekIndex } from '../../utils/dates';
 import { parsePlannedDistance } from '../../utils/workoutTypes';
-import { stravaRunsToDayDisplay } from '../../utils/stravaApi';
+import { getDayMiles } from '../../utils/activityMiles';
 import { usePlan } from '../../hooks/usePlan';
+import { INITIAL_PLAN } from '../../data/plan';
 
 function parseDragId(id) {
   const [wi, di] = id.split('-').map(Number);
@@ -29,16 +30,7 @@ function chunkWeeks(days) {
   return weeks;
 }
 
-function getDayActualMiles(dateStr, logs, stravaRunsByDate) {
-  const dayLogs = logs.filter(l => l.date === dateStr);
-  if (dayLogs.length > 0) {
-    return dayLogs.reduce((s, l) => s + (parseFloat(l.miles) || 0), 0);
-  }
-  const stravaDisplay = stravaRunsToDayDisplay(stravaRunsByDate[dateStr]);
-  return stravaDisplay ? parseFloat(stravaDisplay.miles) || 0 : 0;
-}
-
-function getWeekTotals(weekDays, plan, logs, stravaRunsByDate) {
+function getWeekTotals(weekDays, logs, stravaRunsByDate) {
   let planned = 0;
   let actual = 0;
 
@@ -46,10 +38,11 @@ function getWeekTotals(weekDays, plan, logs, stravaRunsByDate) {
     const cell = getCellForDate(day);
     const dateStr = formatISO(day);
     if (cell) {
-      const workout = plan[cell.wi].d[cell.di];
+      // Always use INITIAL_PLAN so edits/swaps don't change the goal mileage column
+      const workout = INITIAL_PLAN[cell.wi]?.d[cell.di];
       planned += parsePlannedDistance(workout) || 0;
     }
-    actual += getDayActualMiles(dateStr, logs, stravaRunsByDate);
+    actual += getDayMiles(dateStr, logs, stravaRunsByDate);
   }
 
   return { planned, actual };
@@ -68,7 +61,7 @@ export default function MonthGrid({ month, logs, stravaRunsByDate = {}, editMode
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 700, tolerance: 5 } }),
   );
 
   const monthStart = startOfMonth(month);
@@ -139,26 +132,29 @@ export default function MonthGrid({ month, logs, stravaRunsByDate = {}, editMode
 
   const grid = (
     <div>
-      <div className="mb-2 grid grid-cols-[repeat(7,minmax(0,1fr))_4.5rem] gap-1">
+      <div className="mb-2 grid grid-cols-[repeat(7,minmax(0,1fr))_2.5rem] gap-1 md:grid-cols-[repeat(7,minmax(0,1fr))_4.5rem]">
         {DAY_NAMES.map(d => (
-          <div key={d} className="py-2 text-center text-xs font-bold uppercase tracking-widest text-muted">
-            {d}
+          <div key={d} className="py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted md:py-2 md:text-xs">
+            {d.slice(0, 1)}<span className="hidden sm:inline">{d.slice(1)}</span>
           </div>
         ))}
-        <div className="py-2 text-center text-xs font-bold uppercase tracking-widest text-muted">
-          Week
+        <div className="py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted md:py-2 md:text-xs">
+          <span className="hidden md:inline">Week</span>
+          <span className="md:hidden">W</span>
         </div>
       </div>
 
       <div className="space-y-1">
         {weeks.map((weekDays, weekIndex) => {
-          const totals = getWeekTotals(weekDays, plan, logs, stravaRunsByDate);
+          const totals = getWeekTotals(weekDays, logs, stravaRunsByDate);
           const planWeek = getPlanWeekNumber(weekDays);
+          const currentWi = getCurrentWeekIndex();
+          const isCurrent = planWeek != null && currentWi != null && planWeek === currentWi + 1;
 
           return (
             <div
               key={weekIndex}
-              className="grid grid-cols-[repeat(7,minmax(0,1fr))_4.5rem] gap-1"
+              className="grid grid-cols-[repeat(7,minmax(0,1fr))_2.5rem] gap-1 md:grid-cols-[repeat(7,minmax(0,1fr))_4.5rem]"
             >
               {weekDays.map(day => {
                 const cell = getCellForDate(day);
@@ -175,6 +171,8 @@ export default function MonthGrid({ month, logs, stravaRunsByDate = {}, editMode
                     logs={getLogsForDate(dateStr)}
                     stravaRuns={stravaRunsByDate[dateStr] ?? []}
                     inPlan={inPlan}
+                    wi={cell?.wi}
+                    di={cell?.di}
                     editMode={editMode}
                     dragId={inPlan ? dragId : null}
                     isSelected={editMode && selectedId === dragId}
@@ -186,6 +184,7 @@ export default function MonthGrid({ month, logs, stravaRunsByDate = {}, editMode
                 planned={totals.planned}
                 actual={totals.actual}
                 planWeek={planWeek}
+                isCurrent={isCurrent}
               />
             </div>
           );

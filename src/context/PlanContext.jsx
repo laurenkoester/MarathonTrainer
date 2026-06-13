@@ -1,30 +1,29 @@
-import { createContext, useReducer, useEffect, useCallback } from 'react';
+import { createContext, useReducer, useEffect, useCallback, useContext, useRef } from 'react';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { INITIAL_PLAN, deepCopyPlan } from '../data/plan';
+import { AuthContext } from './AuthContext';
+import { db } from '../lib/firebase';
 
 const STORAGE_KEY = 'sb-plan-v1';
 const PLAN_VERSION_KEY = 'sb-plan-version';
 const CURRENT_PLAN_VERSION = 2;
 
-function persistPlan(plan) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
-  } catch { /* quota / private mode */ }
+function persistLocal(plan) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(plan)); } catch { /* quota */ }
 }
 
-function loadPlan() {
+function loadLocal() {
   try {
     const version = parseInt(localStorage.getItem(PLAN_VERSION_KEY) || '0', 10);
     const stored = localStorage.getItem(STORAGE_KEY);
     let plan = stored ? deepCopyPlan(JSON.parse(stored)) : deepCopyPlan(INITIAL_PLAN);
-
     if (version < CURRENT_PLAN_VERSION) {
       for (let wi = 1; wi <= 4; wi++) {
         plan[wi] = { ...INITIAL_PLAN[wi], d: [...INITIAL_PLAN[wi].d] };
       }
       localStorage.setItem(PLAN_VERSION_KEY, String(CURRENT_PLAN_VERSION));
-      persistPlan(plan);
+      persistLocal(plan);
     }
-
     return plan;
   } catch {
     return deepCopyPlan(INITIAL_PLAN);
@@ -39,27 +38,17 @@ function planReducer(state, action) {
       const temp = next[fromWi].d[fromDi];
       next[fromWi].d[fromDi] = next[toWi].d[toDi];
       next[toWi].d[toDi] = temp;
-      persistPlan(next);
       return next;
     }
     case 'EDIT_DAY': {
-      const { wi, di, workout } = action;
       const next = deepCopyPlan(state);
-      next[wi].d[di] = workout;
-      persistPlan(next);
+      next[action.wi].d[action.di] = action.workout;
       return next;
     }
-    case 'RESET': {
-      localStorage.setItem(PLAN_VERSION_KEY, String(CURRENT_PLAN_VERSION));
-      const next = deepCopyPlan(INITIAL_PLAN);
-      persistPlan(next);
-      return next;
-    }
-    case 'LOAD': {
-      const next = deepCopyPlan(action.plan);
-      persistPlan(next);
-      return next;
-    }
+    case 'RESET':
+      return deepCopyPlan(INITIAL_PLAN);
+    case 'LOAD':
+      return deepCopyPlan(action.plan);
     default:
       return state;
   }
@@ -68,26 +57,40 @@ function planReducer(state, action) {
 export const PlanContext = createContext(null);
 
 export function PlanProvider({ children }) {
-  const [plan, dispatch] = useReducer(planReducer, INITIAL_PLAN, () => loadPlan());
+  const { user } = useContext(AuthContext) ?? { user: null };
+  const [plan, dispatch] = useReducer(planReducer, INITIAL_PLAN, () => loadLocal());
+  const remoteRef = useRef(false); // true while applying a remote snapshot
 
-  const reloadFromStorage = useCallback(() => {
-    dispatch({ type: 'LOAD', plan: loadPlan() });
-  }, []);
-
+  // Persist locally on every change
   useEffect(() => {
-    persistPlan(plan);
+    persistLocal(plan);
   }, [plan]);
 
+  // Sync to Firestore whenever plan changes (skip if the change came from Firestore)
   useEffect(() => {
-    function onStorage(e) {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        try {
-          dispatch({ type: 'LOAD', plan: JSON.parse(e.newValue) });
-        } catch { /* ignore */ }
-      }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    if (!user || remoteRef.current) return;
+    const ref = doc(db, 'users', user.uid, 'data', 'plan');
+    setDoc(ref, { weeks: plan }).catch(console.error);
+  }, [plan, user]);
+
+  // Subscribe to Firestore for real-time cross-device updates
+  useEffect(() => {
+    if (!user) return;
+    const ref = doc(db, 'users', user.uid, 'data', 'plan');
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      const { weeks } = snap.data();
+      if (!weeks) return;
+      remoteRef.current = true;
+      dispatch({ type: 'LOAD', plan: weeks });
+      persistLocal(weeks);
+      remoteRef.current = false;
+    });
+    return unsub;
+  }, [user]);
+
+  const reloadFromStorage = useCallback(() => {
+    dispatch({ type: 'LOAD', plan: loadLocal() });
   }, []);
 
   return (

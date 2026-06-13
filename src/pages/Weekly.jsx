@@ -20,7 +20,7 @@ export default function Weekly() {
 
   return (
     <PageWrapper>
-      <h1 className="font-display text-4xl tracking-widest">Weekly</h1>
+      <h1 className="font-display text-3xl tracking-widest sm:text-4xl">Weekly</h1>
 
       <div className="mt-6 flex items-center justify-between">
         <button

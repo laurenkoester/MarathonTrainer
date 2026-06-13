@@ -31,7 +31,7 @@ export default function Calendar() {
   return (
     <PageWrapper>
       <div className="flex items-start justify-between gap-4">
-        <h1 className="font-display text-4xl tracking-widest">Calendar</h1>
+        <h1 className="font-display text-3xl tracking-widest sm:text-4xl">Calendar</h1>
         <button
           onClick={handleToggleEdit}
           className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${

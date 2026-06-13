@@ -1,12 +1,15 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { parsePlannedMiles } from '../../utils/workoutTypes';
 import { DAY_NAMES, getDateForCell, formatISO } from '../../utils/dates';
+import { useStravaAllRuns } from '../../hooks/useStravaAllRuns';
+import { getDayMiles } from '../../utils/activityMiles';
 
 export default function WeeklyBarChart({ wi, week, logs }) {
+  const { runsByDate } = useStravaAllRuns();
+
   const data = week.d.map((workout, di) => {
     const dateStr = formatISO(getDateForCell(wi, di));
-    const dayLogs = logs.filter(l => l.date === dateStr);
-    const actual = dayLogs.reduce((sum, l) => sum + (parseFloat(l.miles) || 0), 0);
+    const actual = getDayMiles(dateStr, logs, runsByDate);
 
     return {
       day: DAY_NAMES[di],

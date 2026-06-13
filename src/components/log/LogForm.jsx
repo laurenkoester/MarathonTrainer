@@ -104,7 +104,7 @@ export default function LogForm({
               key={n}
               type="button"
               onClick={() => setDiff(n)}
-              className={`h-9 w-9 rounded-full border text-sm font-semibold transition-colors ${
+              className={`h-11 w-11 rounded-full border text-sm font-semibold transition-colors ${
                 diff === n ? effortSelectedColor(n) : effortColor(n)
               }`}
             >
@@ -129,7 +129,7 @@ export default function LogForm({
       <button
         type="submit"
         disabled={!diff}
-        className="rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-full rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
       >
         Save Log
       </button>

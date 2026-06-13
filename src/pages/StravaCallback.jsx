@@ -27,7 +27,7 @@ export default function StravaCallback() {
 
   return (
     <PageWrapper>
-      <h1 className="font-display text-4xl tracking-widest">Connecting Strava</h1>
+      <h1 className="font-display text-3xl tracking-widest sm:text-4xl">Connecting Strava</h1>
       {error ? (
         <p className="mt-4 text-red-500">{error}</p>
       ) : (
